@@ -10,15 +10,35 @@ export class ProgramWrapper<U extends string, Attrs extends string> {
         uniforms: Record<U, string>,
         attributes: Record<Attrs, string>,
     ) {
-        this.program = initShaderProgram(gl, vertex, fragment);
-        this.uniforms = getUniforms(gl, this.program, uniforms);
-        this.attributes = getAttributes(gl, this.program, attributes);
+        try {
+            this.program = initShaderProgram(gl, vertex, fragment);
+            this.uniforms = getUniforms(gl, this.program, uniforms);
+            this.attributes = getAttributes(gl, this.program, attributes);
+
+            const numUniforms = gl.getProgramParameter(this.program, gl.ACTIVE_UNIFORMS);
+            const uniformsNames = new Set(Object.values(uniforms));
+            for (let i = 0; i < numUniforms; ++i) {
+                const { name, type } = gl.getActiveUniform(this.program, i)!;
+                if (!uniformsNames.has(name))
+                    console.warn(`Not used uniform ${name} (${type}) in ${this.constructor.name}`);
+            }
+
+            const numAttributes = gl.getProgramParameter(this.program, gl.ACTIVE_ATTRIBUTES);
+            const attributesNames = new Set(Object.values(attributes));
+            for (let i = 0; i < numAttributes; ++i) {
+                const { name, type } = gl.getActiveAttrib(this.program, i)!;
+                if (!attributesNames.has(name))
+                    console.warn(`Not used attribute ${name} (${type}) in ${this.constructor.name}`);
+            }
+        } catch (err: any) {
+            throw new Error(`Failed create program ${this.constructor.name}: ${err}`);
+        }
     }
 }
 
 export class TexturesManager<Ids extends string> {
     private readonly textures: Record<Ids, number>
-    constructor(private gl: WebGL2RenderingContext, texturesMap: Record<Ids, TexImageSource>) {
+    constructor(gl: WebGL2RenderingContext, texturesMap: Record<Ids, TexImageSource>) {
         let textureId = 0;
         this.textures = mapRecord(texturesMap, (image) => {
             const label = (gl as any)[`TEXTURE${textureId}`] as number || undefined
