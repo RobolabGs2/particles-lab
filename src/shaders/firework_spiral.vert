@@ -9,11 +9,11 @@ uniform float u_size;
 uniform float u_radius;
 uniform int u_count;
 uniform float u_layers;
-
+uniform float u_gravitation;
 out float time;
 void main() {
     float angle = PI_2 / (float(u_count) / u_layers) * float(gl_VertexID);
-    vec2 pos = vec2(cos(angle), sin(angle)) * u_radius * a_time;
+    vec2 pos = vec2(cos(angle), sin(angle)) * u_radius * a_time - vec2(0, u_gravitation) * 0.5 * a_time * a_time;
     gl_Position = u_pMatrix * u_mvMatrix * vec4(pos, 0, 1.);
     gl_PointSize = u_size;
     time = smoothstep(0.0, 1.0, a_time);

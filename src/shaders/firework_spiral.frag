@@ -3,11 +3,11 @@
 precision mediump float;
 
 uniform sampler2D u_texture;
+uniform float u_framesCount;
 
 in float time;
 out vec4 FragColor;
 
 void main() {
-    int frame = int(24.0*time);
-    FragColor = mix(texture(u_texture, vec2((float(frame) * 256.0 + gl_PointCoord.x * 256.0) / (256.0 * 24.0), gl_PointCoord.y)), vec4(1.0, 0.0, 0.0, 1.0), 0.0);
+    FragColor = texture(u_texture, vec2((trunc(u_framesCount * time) + gl_PointCoord.x) / u_framesCount, gl_PointCoord.y));
 }

@@ -1,3 +1,5 @@
+import { RecursivePartial } from "../utils";
+
 /* DSL-like helpers for generating html */
 export namespace HTML {
 	export function CreateElement<K extends keyof HTMLElementTagNameMap>(
@@ -133,9 +135,9 @@ export namespace HTML {
 		}
 	}
 	export namespace Input {
-		export type Type =
+		export type Description =
 			{ type: "int" | "float", default: number, min?: number, max?: number, description?: string }
-			| ObjectType & { description?: string }
+			| ObjectDescription
 			| { type: "string", default: string, description?: string }
 			| { type: "boolean", default: boolean, description?: string }
 			| {
@@ -148,84 +150,97 @@ export namespace HTML {
 				/** Пары: название значения енума:отображаемое название в ui */
 				values: Record<string, string>
 			}
-		export type ObjectType<T extends (string | number | symbol) = string> = { type: "object", values: Record<T, Type> }
-		export function GetDefault<T extends string>(type: ObjectType<T>): Record<T, any> {
-			const res = {} as { "": Record<T, any> };
-			CreateTypedInput("", type, res);
-			return res[""];
+		export type ObjectDescription<T extends string = string> = { type: "object", values: Values<T>, description?: string }
+		export type Values<T extends string> = Record<T, Description>
+		export type ObjectType<I extends Values<string>> = {
+			[Property in keyof I]: Type<I[Property]>
+		};
+		export type Type<I extends Description> =
+			I["type"] extends "int" | "float" ? number :
+			I["type"] extends "string" | "color" ? string :
+			I["type"] extends "boolean" ? boolean :
+			I["type"] extends "enum" ? string :
+			I extends ObjectDescription ? ObjectType<I["values"]> :
+			unknown;
+		export function GetDefault<T extends Values<string>>(type: T): ObjectType<T> {
+			const res = {} as ObjectType<T>
+			CreateObjectInput(type, res);
+			return res;
+		}
+
+		function CreateObjectInput<K extends string, D extends Values<K>>(desc: D, output: ObjectType<D>): HTMLElement {
+			return CreateElement("ul", Append(
+				Entries(desc).
+					map(([name, type]) => CreateElement("li", Append(
+						CreateElement("label", SetText(name as string, type.description || name as string), (el) => el.htmlFor = name as string),
+						CreateTypedInput(name as string, type, (value) => output[name as keyof ObjectType<D>] = value as ObjectType<D>[keyof ObjectType<D>], output[name]))))
+			));
 		}
 		/** output - в этот объект будут попадать значения по мере заполнения полей инпута
 		 * Если в нём есть заполненные поля - они займут место дефолтных
 		 */
-		export function CreateTypedInput(name: string, type: Type, output: Record<string, any>, required = true): HTMLElement {
-			if (type.type !== "object" && output[name] === undefined) {
-				output[name] = type.default;
-			}
+		function CreateTypedInput<K extends string, T extends Description>(name: K, type: T, onChange: (value: Type<T>) => void, defaultOverride: Type<T> | undefined, required = true): HTMLElement {
+			// if (type.type !== "object" && onChange[name] === undefined) {
+			// onChange[name] = type.default as any;
+			// }
 			switch (type.type) {
 				case "boolean":
 				case "string":
 				case "int":
 				case "float":
 				case "color":
+					onChange(defaultOverride || type.default as Type<T>);
 					return CreateElement("input",
 						SetName(name),
 						SetId(name),
 						SetTitle(type.description || name),
 						SetRequired(required),
 						AddEventListener("change", function (ev: Event) {
-							output[name] = getValue(this as HTMLInputElement);
+							onChange(getValue(this as HTMLInputElement) as Type<T>);
 						}),
-						...additionalModifiers(type), setValue.bind(null, type, output[name]));
+						...additionalModifiers(type), setValue.bind(null, type, or(defaultOverride, type.default as Type<T>)));
 				case "enum":
-					return HTML.ModifyElement(CreateSelector(output[name], type.values, value => output[name] = value), SetTitle(type.description || name), SetId(name));
+					onChange(defaultOverride || type.default as Type<T>);
+					return HTML.ModifyElement(CreateSelector(or(defaultOverride as string, type.default), type.values, onChange as any), SetTitle(type.description || name), SetId(name));
 				case "object":
-					const innerOutput = output[name] === undefined ? (output[name] = {}) : output[name];
-					return CreateElement("ul", Append(
-						Object.entries(type.values).
-							map(([name, type]) => CreateElement("li", Append(
-								CreateElement("label", SetText(name, type.description || name), (el) => el.htmlFor = name),
-								CreateTypedInput(name, type, innerOutput))))
-					));
+					const innerOutput = (defaultOverride || {}) as any;
+					onChange(innerOutput)
+					return CreateObjectInput(type.values, innerOutput);
 			}
 		}
-		export function CreateForm<T extends object>(
-			description: Record<keyof T, HTML.Input.Type>,
-			buttons: Record<string, (input: T, actualize: (values: T) => void) => void>,
+		export function CreateForm<T extends Values<string>>(
+			description: T,
+			buttons: Record<string, (input: ObjectType<T>, actualize: (values: ObjectType<T>) => void) => void>,
 			clickButton?: string,
-			defaults?: Partial<T>): HTMLElement {
-			const output = {} as { root: T };
-			if (defaults)
-				output.root = defaults as T;
-			const descInput = {
-				type: "object",
-				values: description,
-			} as const;
-			const h = HTML.Input.CreateTypedInput("root", descInput, output);
+			defaults?: RecursivePartial<ObjectType<T>>): HTMLElement {
+			let output = (defaults || {}) as ObjectType<T>;
+			const h = CreateObjectInput(description, output);
 			let lastClickedButton = clickButton;
 			const inputContainer = HTML.CreateElement("section", HTML.Append(h), HTML.SetStyles(s => s.width = "286px"), HTML.AddEventListener("click", hideChildOf("li")));
 			const form = HTML.CreateElement("form", HTML.AddClass("settings-input"), HTML.Append(
 				HTML.CreateElement("header"),
 				inputContainer));
 			return HTML.ModifyElement(form, HTML.Append(
-				HTML.CreateElement("footer", HTML.FlexContainer("row", "space-around"), HTML.Append(Object.keys(buttons).map((text) =>
-					HTML.CreateElement("input", HTML.SetInputType("submit"), HTML.SetStyles(s => { s.flex = "1"; s.margin = "8px" }),
-						HTML.AddEventListener("click",
-							() => { lastClickedButton = text; }),
-						(el) => { el.value = text; if (text === clickButton) setTimeout(() => el.click()) })
-				)))
+				HTML.CreateElement("footer", HTML.FlexContainer("row", "space-around", { wrap: true }), HTML.SetStyles(s => s.width = "286px"),
+					HTML.Append(Object.keys(buttons).map((text) =>
+						HTML.CreateElement("input", HTML.SetInputType("submit"), HTML.SetStyles(s => { s.flex = "1"; s.margin = "8px" }),
+							HTML.AddEventListener("click",
+								() => { lastClickedButton = text; }),
+							(el) => { el.value = text; if (text === clickButton) setTimeout(() => el.click()) })
+					)))
 			), HTML.AddEventListener("submit", (ev) => {
 				ev.preventDefault();
 				if (lastClickedButton) {
-					buttons[lastClickedButton](Copy(output.root), (actual) => {
+					buttons[lastClickedButton](Copy(output), (actual) => {
 						inputContainer.innerHTML = "";
-						output.root = Copy(actual);
-						inputContainer.append(HTML.Input.CreateTypedInput("root", descInput, output));
+						output = Copy(actual);
+						inputContainer.append(CreateObjectInput(description, output));
 					});
 				}
 			}));
 		}
 
-		function additionalModifiers(type: Type) {
+		function additionalModifiers(type: Description) {
 			switch (type.type) {
 				case "float":
 					return [
@@ -252,7 +267,7 @@ export namespace HTML {
 				default: return input.value;
 			}
 		}
-		function setValue(type: Type, value: any, input: HTMLInputElement) {
+		function setValue(type: Description, value: any, input: HTMLInputElement) {
 			switch (type.type) {
 				case "int":
 				case "float":
@@ -306,4 +321,9 @@ export function GetStyleSheet(): Promise<CSSStyleSheet> {
 				});
 			}))
 	})
+}
+
+
+function Entries<T>(obj: T): [keyof T, T[keyof T]][] {
+	return Object.entries(obj) as [keyof T, T[keyof T]][]
 }

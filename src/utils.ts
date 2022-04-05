@@ -29,3 +29,27 @@ export function mapRecord<K extends string, T1, T2>(record: Record<K, T1>, map: 
         return [key, map(value, key as K)];
     })) as Record<K, T2>;
 }
+
+export type RecursivePartial<T> = {
+    [P in keyof T]?:
+    T[P] extends (infer U)[] ? RecursivePartial<U>[] :
+    T[P] extends object ? RecursivePartial<T[P]> :
+    T[P];
+};
+
+export function Merge<T>(defaults: T, value: RecursivePartial<T>): T {
+    for (let x in defaults) {
+        const actual = value[x];
+        if (actual === undefined) {
+            value[x] = Copy(defaults[x]) as any;
+        } else if (typeof actual === "object") {
+            Merge(defaults[x], actual as T[typeof x]);
+        }
+    }
+    return value as T;
+}
+
+
+function Copy<T>(c: T): T {
+	return JSON.parse(JSON.stringify(c)) as T;
+}

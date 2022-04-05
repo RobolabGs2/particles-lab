@@ -2,16 +2,11 @@ import images from './images'
 
 import * as Shaders from './shaders'
 import { HTML } from './web/html'
-import { loadImage, mapRecord, Rand } from './utils'
+import { loadImage, mapRecord, Merge, Rand } from './utils'
 import { ProgramWrapper, TexturesManager } from './webgl'
 import { StyleSheetTree, WindowsManager } from './web/windows'
 import spiralFirework from './spiral_fireworks'
 
-
-interface ParticleSystemDemo<T extends string, Textures extends string> {
-    settings: Record<T, Record<T, HTML.Input.Type>>
-    make(textureManager: TexturesManager<Textures>, settings: Record<T, unknown>): { draw(dt: number, mvMatrix: Float32Array, pMatrix: Float32Array): void }
-}
 
 function downloadImages<T extends string>(urlsMap: Record<T, string>): Promise<Record<T, HTMLImageElement>> {
     const urls = Object.entries<string>(urlsMap);
@@ -144,14 +139,20 @@ downloadImages(images).then(images => {
                 }
                 frameId = requestAnimationFrame(draw)
             }
-            const presets = mapRecord(particlesSystems[key].presets || {}, (preset) => {
+            const { settings, presets } = particlesSystems[key]
+            const defaultSettings = HTML.Input.GetDefault(settings)
+            const presetsButtons = mapRecord({
+                default: defaultSettings,
+                ...presets
+            }, (preset) => {
+                preset = Merge(defaultSettings, preset);
                 return (input: any, actualize: (values: any) => void) => {
                     actualize(preset);
                     start(preset);
                 }
             })
             settingsContainer.appendChild(HTML.Input.CreateForm(particlesSystems[key].settings, {
-                start, ...presets
+                start, ...presetsButtons
             }, "start"))
         }),
         settingsContainer
