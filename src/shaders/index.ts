@@ -37,3 +37,11 @@ export const fireworkSpiral: RawShaders = {
     vertex: fireworkSpiralVertex,
     fragment: fireworkSpiralFrag,
 }
+
+import smokeVertex from './smoke.vert'
+import smokeFrag from './smoke.frag'
+
+export const smoke: RawShaders = {
+    vertex: smokeVertex,
+    fragment: smokeFrag,
+}

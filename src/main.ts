@@ -7,11 +7,13 @@ import { StyleSheetTree, WindowsManager } from './web/windows'
 import spiralFirework from './spiral_fireworks'
 import circleFirework from './circle_firework'
 import sparking from './sparking'
+import smoke from './smoke'
 
 const particlesSystemsFactory = {
     sparking: { name: "Бенгальский огонь", system: sparking },
     circleFirework: { name: "Фейрверк", system: circleFirework },
     spiralFirework: { name: "Фейрверк спиральный", system: spiralFirework },
+    smoke: { name: "Дым", system: smoke },
 } as const
 
 type SystemID = keyof typeof particlesSystemsFactory;
