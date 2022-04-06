@@ -81,7 +81,7 @@ export namespace HTML {
 		return HTML.ModifyElement(button, AddEventListener("click", hide))
 	}
 
-	export function CreateSelector<T extends string>(defaultKey: T, options: Record<T, string>, onChange: (value: T) => void) {
+	export function CreateSelector<T extends string, K extends T>(defaultKey: K, options: Record<T, string>, onChange: (value: T) => void) {
 		return HTML.CreateElement("select",
 			HTML.AddEventListener("change", function () {
 				try {

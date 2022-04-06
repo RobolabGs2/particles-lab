@@ -49,7 +49,36 @@ export function Merge<T>(defaults: T, value: RecursivePartial<T>): T {
     return value as T;
 }
 
+export function downloadImages<T extends string>(urlsMap: Record<T, string>): Promise<Record<T, HTMLImageElement>> {
+    const urls = Object.entries<string>(urlsMap);
+    return Promise.all(urls.map(([_, url]) => url).map(loadImage)).then(images =>
+        Object.fromEntries(images.map((img, i) => ([urls[i][0], img]))) as Record<T, HTMLImageElement>
+    );
+}
+
 
 function Copy<T>(c: T): T {
 	return JSON.parse(JSON.stringify(c)) as T;
+}
+
+export function loadSettingsFromURL<T extends Record<string, any>>(defaults: T): T {
+    const url = new URL(location.href);
+    return Object.fromEntries(Object.entries(defaults).map(([key, defaultValue]) =>
+        [key, getOrDefault(key, defaultValue, url.searchParams)]
+    )) as T
+}
+
+function getOrDefault<T>(key: string, origin: T, params: URLSearchParams): T {
+    const hasKey = params.has(key);
+    const value = params.get(key);
+    switch (typeof origin) {
+        case "string":
+            return (hasKey ? value : origin) as unknown as T;
+        case "number":
+            return (hasKey ? Number(value) : origin) as unknown as T;
+        case "boolean":
+            return (hasKey ? (value !== "false") : origin) as unknown as T;
+        default:
+            throw new Error(`type ${typeof origin} does not supported`);
+    }
 }
