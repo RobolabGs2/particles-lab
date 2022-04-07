@@ -28,6 +28,7 @@ const SettingsDescription = {
 type Settings = HTML.Input.ObjectType<typeof SettingsDescription>
 
 export default (gl: WebGL2RenderingContext) => ({
+    name: "Фейрверк спиральный",
     firework: new FireworkShader(gl),
     settings: SettingsDescription,
     make(textures: TexturesManager<"fireworkRed" | "fireworkGreen" | "fireworkBlue">, { size, groups, count, r, layers, speed, colors, gravitation }: Settings) {
@@ -59,6 +60,11 @@ export default (gl: WebGL2RenderingContext) => ({
             size: 32,
             groups: 2,
             layers: 1,
+        },
+        UpStar: {
+            groups: 7,
+            layers: 16,
+            gravitation: -1000
         },
         Explosion1: {
             count: 40,

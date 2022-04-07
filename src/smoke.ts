@@ -8,8 +8,8 @@ const SettingsDescription = {
     fireColor: { type: 'color', default: "#FF0D05" },
     smokeColor: { type: 'color', default: "#1F1F1F" },
     size: { type: 'int', default: 64 },
-    groups: { type: 'int', default: 1 },
-    layers: { type: 'float', default: 3 },
+    groups: { type: 'float', default: 1 },
+    width: { type: 'float', default: 80 },
     gravitation: { type: 'float', default: -1500 },
 } as const
 
@@ -27,9 +27,14 @@ function colorFromStringToVec4(s: string): [number, number, number, number] {
 }
 
 export default (gl: WebGL2RenderingContext) => ({
-    firework: new FireworkShader(gl),
+    name: "Дым и огонь",
+    shader: new SmokeShader(gl),
     settings: SettingsDescription,
-    make(textures: TexturesManager<"smoke">, { fireColor: color, smokeColor: color2, size, groups, count, layers, speed, gravitation }: Settings) {
+    make(textures: TexturesManager<"smoke">, {
+        fireColor: color, smokeColor: color2,
+        size, groups, count, speed, gravitation,
+        width,
+    }: Settings) {
         const times = new Float32Array(count).fill(0);
         const delta = 1 / count;
         for (let i = 0; i < count; i++)
@@ -44,16 +49,27 @@ export default (gl: WebGL2RenderingContext) => ({
             for (let i = 0; i < count; i++)
                 times[i] = (times[i] + dt * speed) % 1;
             for (let i = 0; i < smokeCount; i++)
-                smokeTimes[i] = (smokeTimes[i] + deltaSmoke * speed*5) % 1;
-            this.firework.draw(textures.get('smoke'), mvMatrix, projectionMatrix, times, size, layers, gravitation, colorFromStringToVec4(color));
-            this.firework.draw(textures.get('smoke'), mvMatrix, projectionMatrix, smokeTimes, size, layers, gravitation, colorFromStringToVec4(color2), 0);
+                smokeTimes[i] = (smokeTimes[i] + deltaSmoke * speed * 5) % 1;
+            this.shader.draw(textures.get('smoke'), mvMatrix, projectionMatrix, times, size, gravitation, colorFromStringToVec4(color), width);
+            this.shader.draw(textures.get('smoke'), mvMatrix, projectionMatrix, smokeTimes, size, gravitation, colorFromStringToVec4(color2), width, 0);
         }
     },
     presets: {
+        Fireball: {
+            width: 20,
+        },
+        Orange: {
+            fireColor: "#D58E1A",
+            smokeColor: "#38250b",
+        },
+        Green: {
+            fireColor: "#1ad552",
+            smokeColor: "#3a647e",
+        }
     },
 })
 
-class FireworkShader {
+class SmokeShader {
     constructor(private gl: WebGL2RenderingContext) { }
     private posBuffer: WebGLBuffer = this.gl.createBuffer()!
     private shader = new ProgramWrapper(this.gl, Shaders.smoke, {
@@ -61,22 +77,22 @@ class FireworkShader {
         mvMatrix: "u_mvMatrix",
         pMatrix: "u_pMatrix",
         size: "u_size",
-        layers: "u_layers",
         gravitation: "u_gravitation",
         color: "u_color",
         shift: "u_timeShift",
+        width: "u_width",
     }, {
         time: "a_time"
     });
-    draw(textureID: number, mvMatrix: Float32Array, pMatrix: Float32Array, times: Float32Array, size: number, layers: number, g: number, color: [number, number, number, number], shift = 1) {
+    draw(textureID: number, mvMatrix: Float32Array, pMatrix: Float32Array, times: Float32Array, size: number, g: number, color: [number, number, number, number], width: number, shift = 1) {
         const gl = this.gl;
         const { uniforms, attributes, program } = this.shader;
         gl.useProgram(program);
         gl.uniform1i(uniforms.texture, textureID);
         gl.uniform1f(uniforms.size, size);
-        gl.uniform1f(uniforms.layers, layers);
         gl.uniform1f(uniforms.gravitation, g);
         gl.uniform1f(uniforms.shift, shift);
+        gl.uniform1f(uniforms.width, width);
         gl.uniform4f(uniforms.color, ...color);
         gl.uniformMatrix4fv(uniforms.mvMatrix, false, mvMatrix);
         gl.uniformMatrix4fv(uniforms.pMatrix, false, pMatrix);

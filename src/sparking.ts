@@ -4,6 +4,7 @@ import { HTML } from './web/html'
 import { ProgramWrapper, TexturesManager } from './webgl'
 
 export default (gl: WebGL2RenderingContext) => ({
+    name: "Бенгальский огонь",
     sparks: new SparkShader(gl),
     tails: new TailShader(gl),
     settings: {

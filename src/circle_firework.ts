@@ -3,6 +3,7 @@ import { HTML } from './web/html'
 import { ProgramWrapper, TexturesManager } from "./webgl"
 
 export default (gl: WebGL2RenderingContext) => ({
+    name: "Фейерверк",
     firework: new FireworkShader(gl),
     settings: {
         count: {

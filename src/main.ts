@@ -10,10 +10,10 @@ import sparking from './sparking'
 import smoke from './smoke'
 
 const particlesSystemsFactory = {
-    sparking: { name: "Бенгальский огонь", system: sparking },
-    circleFirework: { name: "Фейрверк", system: circleFirework },
-    spiralFirework: { name: "Фейрверк спиральный", system: spiralFirework },
-    smoke: { name: "Дым", system: smoke },
+    sparking: sparking,
+    circleFirework: circleFirework,
+    spiralFirework: spiralFirework,
+    smoke: smoke,
 } as const
 
 type SystemID = keyof typeof particlesSystemsFactory;
@@ -30,6 +30,8 @@ if (!isSystemID(systemID)) {
     throw new Error(`Unknown system '${systemID}'`);
 }
 
+
+
 downloadImages(images).then(images => {
     const styleSheet = document.querySelector("style")!.sheet!
     const canvas = document.querySelector('canvas')!
@@ -42,6 +44,12 @@ downloadImages(images).then(images => {
 
     const textures = new TexturesManager(gl, images)
     const windows = new WindowsManager(HTML.CreateElement('div', (el) => document.body.appendChild(el)), new StyleSheetTree(styleSheet))
+    function ViewPreset(preset: object) {
+        windows.CreateCloseableWindow("Preset", HTML.CreateElement('pre', HTML.SetText(JSON.stringify(preset, undefined, 4))))
+    }
+    function CopyPreset(preset: object) {
+        navigator.clipboard.writeText(JSON.stringify(preset, undefined, 4))
+    }
     const aspectRatio = canvas.width / canvas.height
     const tgAngle = Math.tan(Math.PI / 4)
     const projectionMatrix = new Float32Array([
@@ -57,7 +65,7 @@ downloadImages(images).then(images => {
         0, 0, 0, 1,
     ])
 
-    const particlesSystems = mapRecord(particlesSystemsFactory, (desc) => ({ ...desc, system: desc.system(gl) }));
+    const particlesSystems = mapRecord(particlesSystemsFactory, (desc) => (desc(gl)));
     let lastTick = 0
     let frameId = -1;
     const settingsContainer = HTML.CreateElement('article')
@@ -67,7 +75,7 @@ downloadImages(images).then(images => {
             settingsContainer.innerHTML = ""
             if (frameId != -1)
                 cancelAnimationFrame(frameId)
-            const description = particlesSystems[key].system;
+            const description = particlesSystems[key];
             type Settings = HTML.Input.ObjectType<typeof description["settings"]>
             const start = (input: Settings): void => {
                 if (frameId != -1)
@@ -87,7 +95,7 @@ downloadImages(images).then(images => {
             const { settings, presets } = description;
             const defaultSettings = HTML.Input.GetDefault(settings)
             const presetsButtons = mapRecord<keyof typeof presets, RecursivePartial<Settings>, (i: Settings, a: (v: Settings) => void) => void>({
-                default: defaultSettings,
+                Default: defaultSettings,
                 ...presets
             }, (partialPreset) => {
                 const preset = Merge(defaultSettings, partialPreset);
@@ -96,7 +104,7 @@ downloadImages(images).then(images => {
                     start(preset);
                 }
             })
-            settingsContainer.appendChild(HTML.Input.CreateForm(settings, { start, ...presetsButtons }, "start"))
+            settingsContainer.appendChild(HTML.Input.CreateForm(settings, { Start: start, ...presetsButtons, ViewPreset, CopyPreset }, "Start"))
         }),
         settingsContainer
     )));
