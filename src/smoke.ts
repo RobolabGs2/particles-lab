@@ -3,19 +3,14 @@ import * as Shaders from './shaders'
 import { HTML } from "./web/html";
 
 const SettingsDescription = {
-    count: { type: 'int', default: 101 },
-    r: {
-        type: 'float',
-        default: 340,
-        min: 0.1,
-        max: 3400,
-    },
-    speed: { type: 'float', default: 0.1 },
-    color: { type: 'color', default: "#FFFFFF" },
-    size: { type: 'int', default: 32 },
+    count: { type: 'int', default: 1001 },
+    speed: { type: 'float', default: 0.5 },
+    fireColor: { type: 'color', default: "#FF0D05" },
+    smokeColor: { type: 'color', default: "#1F1F1F" },
+    size: { type: 'int', default: 64 },
     groups: { type: 'int', default: 1 },
     layers: { type: 'float', default: 3 },
-    gravitation: { type: 'float', default: -4000 },
+    gravitation: { type: 'float', default: -1500 },
 } as const
 
 type Settings = HTML.Input.ObjectType<typeof SettingsDescription>
@@ -34,15 +29,24 @@ function colorFromStringToVec4(s: string): [number, number, number, number] {
 export default (gl: WebGL2RenderingContext) => ({
     firework: new FireworkShader(gl),
     settings: SettingsDescription,
-    make(textures: TexturesManager<"smoke">, { color, size, groups, count, r, layers, speed, gravitation }: Settings) {
+    make(textures: TexturesManager<"smoke">, { fireColor: color, smokeColor: color2, size, groups, count, layers, speed, gravitation }: Settings) {
         const times = new Float32Array(count).fill(0);
         const delta = 1 / count;
         for (let i = 0; i < count; i++)
             times[i] = delta * (i % (count / groups));
+
+        const smokeCount = count / 5
+        const smokeTimes = new Float32Array(smokeCount).fill(0);
+        const deltaSmoke = 1 / smokeCount;
+        for (let i = 0; i < smokeCount; i++)
+            smokeTimes[i] = deltaSmoke * (i % (smokeCount / groups));
         return (dt: number, mvMatrix: Float32Array, projectionMatrix: Float32Array) => {
             for (let i = 0; i < count; i++)
                 times[i] = (times[i] + dt * speed) % 1;
-            this.firework.draw(textures.get('smoke'), mvMatrix, projectionMatrix, times, size, r, layers, gravitation, 9, colorFromStringToVec4(color));
+            for (let i = 0; i < smokeCount; i++)
+                smokeTimes[i] = (smokeTimes[i] + deltaSmoke * speed*5) % 1;
+            this.firework.draw(textures.get('smoke'), mvMatrix, projectionMatrix, times, size, layers, gravitation, colorFromStringToVec4(color));
+            this.firework.draw(textures.get('smoke'), mvMatrix, projectionMatrix, smokeTimes, size, layers, gravitation, colorFromStringToVec4(color2), 0);
         }
     },
     presets: {
@@ -57,27 +61,23 @@ class FireworkShader {
         mvMatrix: "u_mvMatrix",
         pMatrix: "u_pMatrix",
         size: "u_size",
-        radius: "u_radius",
-        count: "u_count",
         layers: "u_layers",
         gravitation: "u_gravitation",
-        framesCount: "u_framesCount",
-        color: "u_color"
+        color: "u_color",
+        shift: "u_timeShift",
     }, {
         time: "a_time"
     });
-    draw(textureID: number, mvMatrix: Float32Array, pMatrix: Float32Array, times: Float32Array, size: number, r: number, layers: number, g: number, framesCount: number, color: [number, number, number, number]) {
+    draw(textureID: number, mvMatrix: Float32Array, pMatrix: Float32Array, times: Float32Array, size: number, layers: number, g: number, color: [number, number, number, number], shift = 1) {
         const gl = this.gl;
         const { uniforms, attributes, program } = this.shader;
         gl.useProgram(program);
         gl.uniform1i(uniforms.texture, textureID);
         gl.uniform1f(uniforms.size, size);
-        gl.uniform1f(uniforms.radius, r);
-        gl.uniform1i(uniforms.count, times.length);
         gl.uniform1f(uniforms.layers, layers);
         gl.uniform1f(uniforms.gravitation, g);
+        gl.uniform1f(uniforms.shift, shift);
         gl.uniform4f(uniforms.color, ...color);
-        gl.uniform1f(uniforms.framesCount, framesCount);
         gl.uniformMatrix4fv(uniforms.mvMatrix, false, mvMatrix);
         gl.uniformMatrix4fv(uniforms.pMatrix, false, pMatrix);
 
